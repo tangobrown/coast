@@ -19,6 +19,11 @@ const sans = Hanken_Grotesk({
   display: "swap",
 })
 
+// Every page reads the visitor's bag (a cookie) and live catalogue data, so
+// nothing is pre-rendered at build time. This also means the build never needs
+// to reach the backend (Railway's private network isn't available while building).
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
   title: {
     default: "Coast — Real fragrance for the car",
