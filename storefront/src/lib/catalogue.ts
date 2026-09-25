@@ -3,10 +3,36 @@ import type { HttpTypes } from "@medusajs/types"
 import { sdk } from "./medusa"
 import type { Line, Scent, ScentVariant } from "./types"
 
-// Catalogue data changes rarely; cache it for a minute across requests.
-const CATALOGUE_CACHE = { next: { revalidate: 60, tags: ["catalogue"] } }
+// Catalogue data changes rarely, so it's kept in memory and refreshed in the
+// background at most once a minute. Pages render dynamically (they read the
+// bag cookie), which switches off Next's fetch cache, so this cache is what
+// keeps each page view and bag action from re-downloading the whole catalogue.
+const CATALOGUE_TTL_MS = 60_000
+const CATALOGUE_CACHE = { cache: "no-store" as const }
 
-export async function getRegion(): Promise<HttpTypes.StoreRegion> {
+function cached<T>(load: () => Promise<T>): () => Promise<T> {
+  let value: { data: T; at: number } | null = null
+  let inflight: Promise<T> | null = null
+  const refresh = () => {
+    inflight ??= load()
+      .then((data) => {
+        value = { data, at: Date.now() }
+        return data
+      })
+      .finally(() => {
+        inflight = null
+      })
+    return inflight
+  }
+  return async () => {
+    if (!value) return refresh()
+    // Serve what we have; refresh in the background once it's stale.
+    if (Date.now() - value.at > CATALOGUE_TTL_MS) refresh().catch(() => {})
+    return value.data
+  }
+}
+
+export const getRegion = cached(async (): Promise<HttpTypes.StoreRegion> => {
   const { regions } = await sdk.client.fetch<HttpTypes.StoreRegionListResponse>(
     "/store/regions",
     { query: { fields: "id,name,currency_code,*countries" }, ...CATALOGUE_CACHE }
@@ -17,7 +43,7 @@ export async function getRegion(): Promise<HttpTypes.StoreRegion> {
     throw new Error("No region found in Medusa. Has the backend been seeded?")
   }
   return region
-}
+})
 
 function toLine(c: HttpTypes.StoreCollection | null | undefined): Line | null {
   if (!c) return null
@@ -35,7 +61,7 @@ function toLine(c: HttpTypes.StoreCollection | null | undefined): Line | null {
   }
 }
 
-export async function getLines(): Promise<Line[]> {
+export const getLines = cached(async (): Promise<Line[]> => {
   const { collections } = await sdk.client.fetch<HttpTypes.StoreCollectionListResponse>(
     "/store/collections",
     { query: { fields: "id,handle,title,metadata", limit: 50 }, ...CATALOGUE_CACHE }
@@ -43,7 +69,7 @@ export async function getLines(): Promise<Line[]> {
   return collections
     .map((c) => toLine(c)!)
     .sort((a, b) => a.sort - b.sort || a.title.localeCompare(b.title))
-}
+})
 
 function variantOf(
   p: HttpTypes.StoreProduct,
@@ -91,7 +117,7 @@ function toScent(p: HttpTypes.StoreProduct, lines: Line[]): Scent {
 }
 
 /** Every published scent, sorted by line, then `metadata.sort`, then title. */
-export async function getScents(): Promise<Scent[]> {
+export const getScents = cached(async (): Promise<Scent[]> => {
   const [region, lines] = await Promise.all([getRegion(), getLines()])
   const { products } = await sdk.client.fetch<HttpTypes.StoreProductListResponse>(
     "/store/products",
@@ -114,7 +140,7 @@ export async function getScents(): Promise<Scent[]> {
         a.sort - b.sort ||
         a.title.localeCompare(b.title)
     )
-}
+})
 
 export async function getScent(handle: string): Promise<Scent | null> {
   const scents = await getScents()

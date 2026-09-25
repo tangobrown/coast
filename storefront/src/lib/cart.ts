@@ -139,11 +139,13 @@ const WITH_CART = { fields: CART_FIELDS }
 
 export async function addToCart(variantId: string, quantity: number): Promise<ActionResult> {
   const body = { variant_id: variantId, quantity }
+  const started = Date.now()
   try {
     const existing = await getCartId()
     if (existing) {
       try {
         const { cart } = await sdk.store.cart.createLineItem(existing, body, WITH_CART)
+        console.info(`[cart] add to bag: backend ${Date.now() - started}ms`)
         return { ok: true, data: await toView(cart) }
       } catch {
         // Cart expired or was already checked out — start a fresh one below.
@@ -151,6 +153,7 @@ export async function addToCart(variantId: string, quantity: number): Promise<Ac
     }
     const id = await createCart()
     const { cart } = await sdk.store.cart.createLineItem(id, body, WITH_CART)
+    console.info(`[cart] add to bag (new bag): backend ${Date.now() - started}ms`)
     return { ok: true, data: await toView(cart) }
   } catch (e) {
     return fail(e)
