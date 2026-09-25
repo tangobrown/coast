@@ -5,6 +5,8 @@ loadEnv(process.env.NODE_ENV || "development", process.cwd())
 const REDIS_URL = process.env.REDIS_URL
 const STRIPE_API_KEY = process.env.STRIPE_API_KEY
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET
+const POSTMARK_SERVER_TOKEN = process.env.POSTMARK_SERVER_TOKEN
+const EMAIL_FROM = process.env.EMAIL_FROM || "Coast <hello@coastfragrances.co.uk>"
 
 // Optional modules are only switched on when their credentials exist, so the
 // backend boots cleanly before Stripe / Redis have been configured.
@@ -30,6 +32,31 @@ if (STRIPE_API_KEY) {
     },
   })
 }
+
+// Email: Postmark when a token is set, otherwise emails are just logged.
+modules.push({
+  resolve: "@medusajs/medusa/notification",
+  options: {
+    providers: [
+      POSTMARK_SERVER_TOKEN
+        ? {
+            resolve: "./src/modules/postmark",
+            id: "postmark",
+            options: { channels: ["email"], serverToken: POSTMARK_SERVER_TOKEN, from: EMAIL_FROM },
+          }
+        : {
+            resolve: "@medusajs/medusa/notification-local",
+            id: "local-email",
+            options: { name: "Email (logged only)", channels: ["email"] },
+          },
+      {
+        resolve: "@medusajs/medusa/notification-local",
+        id: "local",
+        options: { name: "Local Notification Provider", channels: ["feed"] },
+      },
+    ],
+  },
+})
 
 if (REDIS_URL) {
   modules.push(

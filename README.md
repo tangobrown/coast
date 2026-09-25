@@ -92,11 +92,34 @@ On the next backend deploy, the UK region automatically switches to Stripe as it
 
 Test card: `4242 4242 4242 4242`, any future expiry, any CVC.
 
-### 5. Custom domain (optional)
+### 5. Custom domain
 
-Storefront → **Settings → Networking → Custom Domain**. Then update the backend's `STORE_CORS` to include it (comma-separated), and add the domain in Stripe's payment method domains.
+| Address | Railway service | Port |
+|---|---|---|
+| `coastfragrances.co.uk` | storefront | 8080 |
+| `www.coastfragrances.co.uk` | storefront (redirects to the bare domain) | 8080 |
+| `api.coastfragrances.co.uk` | backend (admin at `/app`, Stripe webhooks) | 8080 |
 
----
+Add each under the service's **Settings → Networking → Custom Domain**, then create the CNAME (and any TXT) records Railway shows in Cloudflare with **DNS only** (grey cloud). Once they're verified, set on the **backend**:
+
+```env
+MEDUSA_BACKEND_URL=https://api.coastfragrances.co.uk
+ADMIN_CORS=https://api.coastfragrances.co.uk
+AUTH_CORS=https://api.coastfragrances.co.uk
+STORE_CORS=https://coastfragrances.co.uk,https://www.coastfragrances.co.uk
+```
+
+and point the Stripe webhook at `https://api.coastfragrances.co.uk/hooks/payment/stripe_stripe`.
+
+### 6. Email (Postmark)
+
+1. Postmark: create a server, verify the `coastfragrances.co.uk` domain (DKIM + Return-Path DNS records), request account approval.
+2. **Backend** variables:
+   ```env
+   POSTMARK_SERVER_TOKEN=...
+   EMAIL_FROM=Coast <hello@coastfragrances.co.uk>
+   ```
+Without a token, emails are only written to the backend logs. Emails sent today: order confirmation.
 
 ## Everyday tasks
 
@@ -144,5 +167,5 @@ npm run dev                  # http://localhost:8000
 - **Prices include VAT.** The UK tax region uses 20% VAT, and prices are tax-inclusive, so £16 on the site is £16 at checkout. If you're not VAT-registered yet, set the rate to 0% in Admin → Settings → Tax Regions. Prices won't change.
 - **Guest checkout only.** No customer accounts yet.
 - **PayPal dropped.** The express row offers Apple Pay and Google Pay through Stripe.
-- **No emails yet.** The refill-reminder opt-in is saved on each order (`metadata.refill_reminders`), ready for when an email provider is added.
+- **Emails via Postmark.** Order confirmations are sent on every order. The refill-reminder opt-in is saved on each order (`metadata.refill_reminders`).
 - **Not done yet:** image storage (see above), email notifications, customer accounts.
