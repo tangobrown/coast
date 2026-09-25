@@ -10,7 +10,8 @@ import { REGION_NAME, seedCoast, wantedPaymentProviders } from "./seed"
  * Runs on every deploy (after migrations). Safe to run repeatedly:
  *  1. Seeds the catalogue the first time only.
  *  2. Points the UK region at Stripe once STRIPE_API_KEY is set.
- *  3. Creates the first admin user from MEDUSA_ADMIN_EMAIL / MEDUSA_ADMIN_PASSWORD.
+ *  3. Makes sure an admin login exists with MEDUSA_ADMIN_EMAIL / MEDUSA_ADMIN_PASSWORD
+ *     (creating it, or resetting its password to match).
  *  4. Logs the storefront's publishable API key.
  */
 export default async function bootstrap({ container }: ExecArgs) {
@@ -49,30 +50,19 @@ export default async function bootstrap({ container }: ExecArgs) {
     )
   }
 
-  // 3. First admin user
-  const email = process.env.MEDUSA_ADMIN_EMAIL
-  const password = process.env.MEDUSA_ADMIN_PASSWORD
+  // 3. Admin login — kept in sync with MEDUSA_ADMIN_EMAIL / MEDUSA_ADMIN_PASSWORD
+  //    so the Railway variables are always the working credentials.
+  const email = process.env.MEDUSA_ADMIN_EMAIL?.trim()
+  const password = process.env.MEDUSA_ADMIN_PASSWORD?.trim()
   if (email && password) {
-    const userService = container.resolve(Modules.USER)
-    const [existing] = await userService.listUsers({ email })
-    if (!existing) {
-      const authService = container.resolve(Modules.AUTH)
-      const { result: users } = await createUsersWorkflow(container).run({
-        input: { users: [{ email }] },
-      })
-      const { authIdentity, error } = await authService.register("emailpass", {
-        body: { email, password },
-      })
-      if (error || !authIdentity) {
-        logger.error(`[bootstrap] Could not create admin user: ${error}`)
-      } else {
-        await authService.updateAuthIdentities({
-          id: authIdentity.id,
-          app_metadata: { user_id: users[0].id },
-        })
-        logger.info(`[bootstrap] Created admin user ${email}`)
-      }
+    try {
+      await ensureAdmin(container, email, password)
+      logger.info(`[bootstrap] Admin login ready for ${email}`)
+    } catch (e) {
+      logger.error(`[bootstrap] Could not set up admin login: ${(e as Error).message}`)
     }
+  } else {
+    logger.warn("[bootstrap] MEDUSA_ADMIN_EMAIL / MEDUSA_ADMIN_PASSWORD not set — no admin login created.")
   }
 
   // 4. Publishable key, so it's easy to find in the deploy logs
@@ -84,4 +74,35 @@ export default async function bootstrap({ container }: ExecArgs) {
   if (keys[0]) {
     logger.info(`[bootstrap] Storefront publishable key: ${keys[0].token}`)
   }
+}
+
+async function ensureAdmin(container: ExecArgs["container"], email: string, password: string) {
+  const userService = container.resolve(Modules.USER)
+  const authService = container.resolve(Modules.AUTH)
+
+  let [user] = await userService.listUsers({ email })
+  if (!user) {
+    const { result } = await createUsersWorkflow(container).run({ input: { users: [{ email }] } })
+    user = result[0]
+  }
+
+  // Existing login: reset its password to the configured one.
+  const updated = await authService.updateProvider("emailpass", { entity_id: email, password })
+  if (updated.success && updated.authIdentity) {
+    await authService.updateAuthIdentities({
+      id: updated.authIdentity.id,
+      app_metadata: { user_id: user.id },
+    })
+    return
+  }
+
+  // No login yet: register one and link it to the user.
+  const { authIdentity, error } = await authService.register("emailpass", {
+    body: { email, password },
+  })
+  if (error || !authIdentity) throw new Error(error ?? "register failed")
+  await authService.updateAuthIdentities({
+    id: authIdentity.id,
+    app_metadata: { user_id: user.id },
+  })
 }
