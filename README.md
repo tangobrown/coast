@@ -26,10 +26,8 @@ You'll end up with **four things** in one Railway project: Postgres, Redis, the 
 **Settings → Source**
 - **Root Directory:** `/backend`
 
-**Settings → Config-as-code** (Railway doesn't pick this up from the root directory automatically)
-- **Railway Config File:** `/backend/railway.json`
-
-That file sets the build command, start command and health check for you.
+**Settings → Config-as-code** (optional)
+- **Railway Config File:** `/backend/railway.json` adds a health check. Railway's default `npm run build` / `npm start` already run the right production commands, so the backend works without it.
 
 **Settings → Networking** → **Generate Domain** (gives you something like `backend-production-xxxx.up.railway.app`).
 
@@ -37,7 +35,7 @@ That file sets the build command, start command and health check for you.
 
 ```env
 DATABASE_URL=${{Postgres.DATABASE_URL}}
-REDIS_URL=${{Redis.REDIS_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}?family=0
 JWT_SECRET=CHANGE_ME_long_random_string
 COOKIE_SECRET=CHANGE_ME_another_long_random_string
 MEDUSA_BACKEND_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}
@@ -48,6 +46,8 @@ MEDUSA_ADMIN_EMAIL=you@example.com
 MEDUSA_ADMIN_PASSWORD=CHANGE_ME_admin_password
 ```
 
+> `?family=0` lets the Redis client connect over Railway's private network.
+>
 > For the random secrets, any long string works. For example, run `openssl rand -hex 32` twice, or mash the keyboard for about 40 characters.
 
 Deploy. The **first** deploy automatically:
@@ -64,7 +64,7 @@ Later deploys skip the seeding, so your edits in the admin are never overwritten
 
 1. **+ Create → GitHub Repo →** `tangobrown/coast` again. Rename it to `storefront`. The name matters because the backend's `STORE_CORS` refers to it.
 2. **Settings → Source → Root Directory:** `/storefront`
-3. **Settings → Config-as-code → Railway Config File:** `/storefront/railway.json`
+3. **Settings → Config-as-code → Railway Config File:** `/storefront/railway.json` (optional; adds a health check)
 4. **Settings → Networking → Generate Domain.**
 5. **Variables** (Raw Editor):
 

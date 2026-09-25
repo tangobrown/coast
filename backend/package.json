@@ -5,14 +5,12 @@
   "private": true,
   "license": "MIT",
   "scripts": {
-    "build": "medusa build",
+    "build": "medusa build && cd .medusa/server && npm install --omit=dev --no-audit --no-fund",
     "seed": "medusa exec ./src/scripts/seed.ts",
     "bootstrap": "medusa exec ./src/scripts/bootstrap.ts",
     "dev": "medusa develop",
-    "start": "medusa start",
+    "start": "cd .medusa/server && export NODE_ENV=production && npm run predeploy && npx medusa start",
     "predeploy": "medusa db:migrate && medusa exec ./src/scripts/bootstrap.js",
-    "railway:build": "medusa build && cd .medusa/server && npm install --omit=dev --no-audit --no-fund",
-    "railway:start": "cd .medusa/server && export NODE_ENV=production && npm run predeploy && npm run start",
     "test:integration:http": "TEST_TYPE=integration:http NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
     "test:integration:modules": "TEST_TYPE=integration:modules NODE_OPTIONS=--experimental-vm-modules jest --silent=false --runInBand --forceExit",
     "test:unit": "TEST_TYPE=unit NODE_OPTIONS=--experimental-vm-modules jest --silent --runInBand --forceExit"
