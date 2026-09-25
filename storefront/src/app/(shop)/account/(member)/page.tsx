@@ -2,11 +2,11 @@ import type { Metadata } from "next"
 import Link from "next/link"
 import { btnPrimary } from "@/components/ui/styles"
 import { listOrders } from "@/lib/auth"
+import { formatDate } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
 
 export const metadata: Metadata = { title: "Your orders", robots: { index: false } }
 
-const dateFmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "long", year: "numeric" })
 
 function statusLabel(status: string, fulfillment: string) {
   if (status === "canceled") return "Cancelled"
@@ -41,7 +41,7 @@ export default async function OrdersPage() {
           >
             <div>
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-2">
-                Order #CF{o.displayId} · {dateFmt.format(new Date(o.createdAt))}
+                Order #CF{o.displayId} · {formatDate(o.createdAt)}
               </div>
               <div className="text-[15px] leading-[1.6] text-ink-2">
                 {o.items.map((i, n) => (

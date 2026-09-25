@@ -14,6 +14,7 @@ type CartContextValue = {
   pending: boolean
   error: string | null
   addItem: (variantId: string, quantity: number) => Promise<boolean>
+  addSubscription: (variantId: string, quantity: number, intervalWeeks: number) => Promise<boolean>
   updateItem: (lineId: string, quantity: number) => Promise<boolean>
   removeItem: (lineId: string) => Promise<boolean>
 }
@@ -99,6 +100,8 @@ export function CartProvider({
       pending: inflight > 0,
       error,
       addItem: (variantId, quantity) => run(() => actions.addToCart(variantId, quantity)),
+      addSubscription: (variantId, quantity, intervalWeeks) =>
+        run(() => actions.addSubscriptionToCart(variantId, quantity, intervalWeeks)),
       updateItem: (lineId, quantity) =>
         run(
           () => actions.updateLineItem(lineId, quantity),

@@ -121,6 +121,24 @@ and point the Stripe webhook at `https://api.coastfragrances.co.uk/hooks/payment
    ```
 Without a token, emails are only written to the backend logs. Emails sent today: order confirmation.
 
+## Customer accounts & refill subscriptions
+
+**Accounts:** customers can sign up, log in, reset a forgotten password (emailed via Postmark) and see their orders, details and delivery address at `/account`. Guest checkout still works for one-off orders.
+
+**Subscriptions (refills only):**
+- On any refill, shoppers can choose **Subscribe & save 5%** and a delivery frequency of every **4, 6 or 8 weeks** (default 6).
+- The first refill is paid in the normal checkout, so it can share a bag with one-off items. Normal delivery rules apply to that first order. A subscription needs an account, so checkout asks guests to log in or sign up.
+- Stripe saves the card during that payment. The backend then charges it automatically for each refill: an hourly job (`src/jobs/renew-subscriptions.ts`) creates a normal, paid order in the admin with **free delivery** ("Subscriber delivery · Royal Mail") and emails the usual order confirmation.
+- If a payment fails, the customer is emailed and the subscription shows "Payment needed". It retries every 3 days (up to 3 attempts), and the customer can update their card or retry from their account.
+- Customers manage everything under **Account → Subscriptions**: skip the next refill, pause/resume, change scent, change frequency, update card, cancel.
+- The subscriber price is always 5% off the refill's *current* price, so changing a refill price in the admin changes future renewals too.
+
+**Useful commands (backend):**
+- `npm run renew-subscriptions` runs the renewal job immediately instead of waiting for the hour.
+- Without `STRIPE_API_KEY` (local development), renewals use a test mode that pretends to charge successfully.
+
+**Optional backend variable:** `STOREFRONT_URL` (defaults to `https://coastfragrances.co.uk`) is used for links in emails.
+
 ## Everyday tasks
 
 **Change products, prices, copy:** Admin → Products. Scent notes live in each product's **Metadata**: `notes_top`, `notes_heart`, `notes_base`, `short_notes`. Best-sellers are products with the `bestseller` tag (ordered by `bestseller_rank` metadata).
@@ -165,7 +183,7 @@ npm run dev                  # http://localhost:8000
 ## Notes and decisions
 
 - **Prices include VAT.** The UK tax region uses 20% VAT, and prices are tax-inclusive, so £16 on the site is £16 at checkout. If you're not VAT-registered yet, set the rate to 0% in Admin → Settings → Tax Regions. Prices won't change.
-- **Guest checkout only.** No customer accounts yet.
+- **Accounts are optional** for one-off orders, and required for subscriptions.
 - **PayPal dropped.** The express row offers Apple Pay and Google Pay through Stripe.
 - **Emails via Postmark.** Order confirmations are sent on every order. The refill-reminder opt-in is saved on each order (`metadata.refill_reminders`).
-- **Not done yet:** image storage (see above), email notifications, customer accounts.
+- **Not done yet:** image storage (see above), refill reminder emails for non-subscribers.

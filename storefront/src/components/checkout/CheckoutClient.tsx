@@ -15,6 +15,7 @@ import type { Address, CustomerView, ShippingOptionView } from "@/lib/types"
 import { EMPTY_ADDRESS, validateAddress, validateEmail, type FieldErrors } from "@/lib/validation"
 import { useCart } from "../cart/CartProvider"
 import { Spinner } from "../ui/Spinner"
+import { btnPrimary, btnSecondary } from "../ui/styles"
 import { Checkbox, Field, SectionHeading } from "./Field"
 import { OrderSummary } from "./OrderSummary"
 import {
@@ -39,7 +40,7 @@ export function CheckoutClient(props: Props) {
   const total = cart?.total ?? 0
   if (props.stripeKey) {
     return (
-      <StripeProvider publishableKey={props.stripeKey} amount={total}>
+      <StripeProvider publishableKey={props.stripeKey} amount={total} saveCard={!!cart?.hasSubscription}>
         <CheckoutForm {...props} />
       </StripeProvider>
     )
@@ -81,7 +82,9 @@ function CheckoutForm({ shippingOptions, stripeKey, allowTestOrders, customer }:
   const [done, setDone] = useState(false)
 
   const paymentsEnabled = !!stripeKey
-  const canPay = paymentsEnabled || allowTestOrders
+  // Subscriptions are managed from an account, so they need one before paying.
+  const needsAccount = !!cart?.hasSubscription && !customer
+  const canPay = (paymentsEnabled || allowTestOrders) && !needsAccount
 
   // Pick a delivery method on arrival so the summary shows a real total.
   const chooseShipping = useCallback(
@@ -278,7 +281,25 @@ function CheckoutForm({ shippingOptions, stripeKey, allowTestOrders, customer }:
           <StripeBridge onReady={onStripeReady} />
         )}
 
-        {paymentsEnabled && (
+        {needsAccount && (
+          <div role="status" className="rounded-[10px] border-[1.5px] border-ink bg-paper p-6">
+            <p className="mb-1 font-serif text-[26px] leading-tight">One quick thing</p>
+            <p className="mb-5 text-[15px] leading-[1.6] text-ink-2">
+              Your bag includes a refill subscription. Log in or create an account so you can skip,
+              pause or cancel it whenever you like.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <a href="/account/login?next=/checkout" className={`${btnPrimary} h-[50px] py-0 text-[15px]`}>
+                Log in
+              </a>
+              <a href="/account/register?next=/checkout" className={`${btnSecondary} h-[50px] py-0`}>
+                Create an account
+              </a>
+            </div>
+          </div>
+        )}
+
+        {paymentsEnabled && !needsAccount && (
           <div className={expressAvailable ? "" : "hidden"}>
             <div className="mb-3 text-center text-[13px] text-muted">Express checkout</div>
             <ExpressCheckout
@@ -360,6 +381,13 @@ function CheckoutForm({ shippingOptions, stripeKey, allowTestOrders, customer }:
 
         <section>
           <SectionHeading>4. Payment</SectionHeading>
+          {cart.hasSubscription && (
+            <p className="mb-4 rounded-[10px] bg-teal/10 p-4 text-sm leading-[1.6] text-teal">
+              Your first refill is included in today’s order. After that we’ll charge your card
+              automatically for each refill, with free delivery. Your card details are stored
+              securely by Stripe.
+            </p>
+          )}
           {paymentsEnabled ? (
             <CardPayment />
           ) : (

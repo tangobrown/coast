@@ -16,14 +16,14 @@ export const STRIPE_PROVIDER_ID = "pp_stripe_stripe"
 
 export const toPence = (amount: number) => Math.round(amount * 100)
 
-const stripePromises = new Map<string, Promise<Stripe | null>>()
-function getStripe(key: string) {
+export const stripePromises = new Map<string, Promise<Stripe | null>>()
+export function getStripe(key: string) {
   if (!stripePromises.has(key)) stripePromises.set(key, loadStripe(key))
   return stripePromises.get(key)!
 }
 
 // Brand styling for Stripe's iframes, from the design handoff.
-const appearance = {
+export const appearance = {
   theme: "flat" as const,
   variables: {
     colorPrimary: "#2E4B4E",
@@ -47,10 +47,13 @@ const appearance = {
 export function StripeProvider({
   publishableKey,
   amount,
+  saveCard = false,
   children,
 }: {
   publishableKey: string
   amount: number
+  /** Must match the PaymentIntent: true when the bag contains a subscription. */
+  saveCard?: boolean
   children: React.ReactNode
 }) {
   const stripePromise = useMemo(() => getStripe(publishableKey), [publishableKey])
@@ -61,6 +64,7 @@ export function StripeProvider({
         mode: "payment",
         amount: Math.max(toPence(amount), 30),
         currency: "gbp",
+        ...(saveCard ? { setupFutureUsage: "off_session" as const } : {}),
         appearance,
         fonts: [
           {

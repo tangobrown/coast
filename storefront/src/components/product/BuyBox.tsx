@@ -8,6 +8,49 @@ import { QtyStepper } from "../ui/QtyStepper"
 import { Spinner } from "../ui/Spinner"
 import { Accordion } from "./Accordion"
 
+const INTERVALS = [4, 6, 8]
+const DEFAULT_WEEKS = 6
+/** Display only — the backend sets the real subscriber price. */
+const subscriberPrice = (price: number) => Math.round(price * 0.95 * 100) / 100
+
+function PurchaseOption({
+  checked,
+  onSelect,
+  title,
+  price,
+  wasPrice,
+  children,
+}: {
+  checked: boolean
+  onSelect: () => void
+  title: string
+  price: number
+  wasPrice?: number
+  children?: React.ReactNode
+}) {
+  return (
+    <div
+      className={`rounded-[10px] border-[1.5px] bg-paper p-4 text-ink transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-teal ${
+        checked ? "border-ink" : "border-line hover:border-input-border"
+      }`}
+    >
+      <label className="flex cursor-pointer items-center justify-between gap-3">
+        <span className="flex items-center gap-3">
+          <input type="radio" name="purchase" checked={checked} onChange={onSelect} className="h-4 w-4 accent-teal" />
+          <span className="text-[15px] font-semibold">{title}</span>
+        </span>
+        <span className="text-[15px] font-semibold">
+          {wasPrice != null && (
+            <span className="mr-2 text-[13px] font-normal text-muted line-through">{formatMoney(wasPrice)}</span>
+          )}
+          {formatMoney(price)}
+        </span>
+      </label>
+      {children && <div className={checked ? "" : "opacity-70"}>{children}</div>}
+    </div>
+  )
+}
+
 export function BuyBox({
   scent,
   initialVariant,
@@ -15,24 +58,30 @@ export function BuyBox({
   scent: Scent
   initialVariant: VariantKind
 }) {
-  const { addItem, openDrawer } = useCart()
+  const { addItem, addSubscription, openDrawer } = useCart()
   const [kind, setKind] = useState<VariantKind>(
     initialVariant === "refill" && scent.refill ? "refill" : "full"
   )
   const [qty, setQty] = useState(1)
+  const [subscribe, setSubscribe] = useState(false)
+  const [weeks, setWeeks] = useState<number>(DEFAULT_WEEKS)
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const line = scent.line
   const format = line?.format ?? "Full"
   const variant = kind === "refill" ? scent.refill : scent.full
-  const unit = variant?.price ?? 0
+  const isSubscription = kind === "refill" && subscribe
+  const refillPrice = scent.refill?.price ?? 0
+  const unit = isSubscription ? subscriberPrice(refillPrice) : (variant?.price ?? 0)
 
   async function onAdd() {
     if (!variant) return
     setAdding(true)
     setError(null)
-    const ok = await addItem(variant.id, qty)
+    const ok = isSubscription
+      ? await addSubscription(variant.id, qty, weeks)
+      : await addItem(variant.id, qty)
     setAdding(false)
     if (ok) {
       openDrawer()
@@ -104,6 +153,44 @@ export function BuyBox({
         </div>
       </fieldset>
 
+      {kind === "refill" && scent.refill && (
+        <fieldset className="mb-[22px]">
+          <legend className="mb-2.5 text-sm font-semibold">How would you like it?</legend>
+          <div className="grid gap-2.5">
+            <PurchaseOption checked={!subscribe} onSelect={() => setSubscribe(false)} title="One-off" price={refillPrice} />
+            <PurchaseOption
+              checked={subscribe}
+              onSelect={() => setSubscribe(true)}
+              title="Subscribe & save 5%"
+              price={subscriberPrice(refillPrice)}
+              wasPrice={refillPrice}
+            >
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+                <label htmlFor="sub-weeks">Deliver every</label>
+                <select
+                  id="sub-weeks"
+                  value={weeks}
+                  onChange={(e) => {
+                    setWeeks(Number(e.target.value))
+                    setSubscribe(true)
+                  }}
+                  className="h-9 rounded-full border border-input-border bg-paper px-3 text-[13px] font-semibold text-ink outline-none focus:border-teal"
+                >
+                  {INTERVALS.map((w) => (
+                    <option key={w} value={w}>
+                      {w} weeks
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="mt-2 text-[13px] leading-normal text-muted">
+                Free delivery on every refill. Skip, pause or cancel any time from your account.
+              </p>
+            </PurchaseOption>
+          </div>
+        </fieldset>
+      )}
+
       <div className="mb-3.5 flex gap-3">
         <QtyStepper size="lg" min={1} value={qty} onChange={(q) => setQty(Math.max(1, q))} />
         <button
@@ -113,7 +200,7 @@ export function BuyBox({
           className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-ink px-4 text-base font-semibold text-paper transition-colors duration-200 hover:bg-teal disabled:opacity-70"
         >
           {adding && <Spinner />}
-          Add to bag — {formatMoney(unit * qty)}
+          {isSubscription ? "Subscribe" : "Add to bag"} — {formatMoney(unit * qty)}
         </button>
       </div>
       {error && (

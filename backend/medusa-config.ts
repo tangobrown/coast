@@ -10,7 +10,7 @@ const EMAIL_FROM = process.env.EMAIL_FROM || "Coast <hello@coastfragrances.co.uk
 
 // Optional modules are only switched on when their credentials exist, so the
 // backend boots cleanly before Stripe / Redis have been configured.
-const modules: Record<string, any>[] = []
+const modules: Record<string, any>[] = [{ resolve: "./src/modules/subscription" }]
 
 if (STRIPE_API_KEY) {
   modules.push({

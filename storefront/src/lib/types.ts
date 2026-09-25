@@ -46,6 +46,10 @@ export type CartLine = {
   unitPrice: number
   total: number
   thumbnail: string | null
+  /** Set when this line is a refill subscription (delivery every N weeks). */
+  subscriptionWeeks: number | null
+  /** Normal price before the subscriber discount. */
+  compareAtPrice: number | null
 }
 
 export type Address = {
@@ -71,6 +75,7 @@ export type CartView = {
   shippingOptionId: string | null
   promoCodes: string[]
   refillReminders: boolean
+  hasSubscription: boolean
 }
 
 export type ShippingOptionView = {
@@ -98,4 +103,21 @@ export type OrderSummary = {
   status: string
   fulfillmentStatus: string
   items: { title: string; subtitle: string; quantity: number }[]
+}
+
+export type SubscriptionView = {
+  id: string
+  status: "active" | "paused" | "payment_failed" | "cancelled"
+  productId: string
+  variantId: string
+  productTitle: string
+  lineTitle: string | null
+  quantity: number
+  intervalWeeks: number
+  nextChargeAt: string
+  lastChargedAt: string | null
+  lastFailureReason: string | null
+  hasCard: boolean
+  price: number | null
+  subscriptionPrice: number | null
 }

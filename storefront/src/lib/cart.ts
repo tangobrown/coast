@@ -9,6 +9,8 @@ import { getCustomer, saveAddress } from "./auth"
 import type { Address, CartView, ShippingOptionView } from "./types"
 
 const CART_COOKIE = "_coast_cart_id"
+/** Line-item metadata key the backend uses to mark a refill subscription. */
+const SUBSCRIPTION_ITEM_KEY = "subscription_interval_weeks"
 
 const CART_FIELDS =
   "id,email,region_id,metadata,item_total,shipping_total,discount_total,total,*items,*shipping_address,*shipping_methods,*promotions"
@@ -56,17 +58,25 @@ async function toView(cart: HttpTypes.StoreCart): Promise<CartView> {
         scent?.refill?.id === item.variant_id ||
         (item.variant_title ?? "").toLowerCase() === "refill"
       const unit = Number(item.unit_price ?? 0)
+      const weeks = Number((item.metadata as any)?.[SUBSCRIPTION_ITEM_KEY]) || null
       return {
         id: item.id,
         variantId: item.variant_id ?? "",
         productHandle: item.product_handle ?? scent?.handle ?? "",
         title: item.product_title ?? scent?.title ?? item.title,
         lineTitle: scent?.line?.title ?? item.product_collection ?? "",
-        variantLabel: isRefill ? "Refill" : (scent?.line?.format ?? item.variant_title ?? ""),
+        variantLabel: weeks
+          ? `Refill every ${weeks} weeks`
+          : isRefill
+            ? "Refill"
+            : (scent?.line?.format ?? item.variant_title ?? ""),
         quantity: item.quantity,
         unitPrice: unit,
         total: unit * item.quantity,
         thumbnail: item.thumbnail ?? scent?.thumbnail ?? null,
+        subscriptionWeeks: weeks,
+        compareAtPrice:
+          weeks && (item as any).compare_at_unit_price ? Number((item as any).compare_at_unit_price) : null,
       }
     })
 
@@ -98,6 +108,7 @@ async function toView(cart: HttpTypes.StoreCart): Promise<CartView> {
       .map((p) => p.code)
       .filter((c): c is string => !!c),
     refillReminders: (cart.metadata as any)?.refill_reminders !== false,
+    hasSubscription: items.some((i) => i.subscriptionWeeks),
   }
 }
 
@@ -159,6 +170,24 @@ export async function addToCart(variantId: string, quantity: number): Promise<Ac
     const { cart } = await sdk.store.cart.createLineItem(id, body, WITH_CART)
     console.info(`[cart] add to bag (new bag): backend ${Date.now() - started}ms`)
     return { ok: true, data: await toView(cart) }
+  } catch (e) {
+    return fail(e)
+  }
+}
+
+export async function addSubscriptionToCart(
+  variantId: string,
+  quantity: number,
+  intervalWeeks: number
+): Promise<ActionResult> {
+  const body = { variant_id: variantId, quantity, interval_weeks: intervalWeeks }
+  const add = (cartId: string) =>
+    sdk.client.fetch(`/store/carts/${cartId}/subscription-items`, { method: "POST", body })
+  try {
+    let id = await getCartId()
+    if (!id || !(await retrieveRaw(id))) id = await createCart()
+    await add(id)
+    return { ok: true, data: await viewById(id) }
   } catch (e) {
     return fail(e)
   }
@@ -318,11 +347,21 @@ export async function initiatePayment(
     const id = await getCartId()
     if (!id) throw new Error("No cart")
     const { cart } = await sdk.store.cart.retrieve(id, {
-      fields: "id,total,currency_code,*payment_collection,*payment_collection.payment_sessions",
+      fields:
+        "id,total,currency_code,*items,*payment_collection,*payment_collection.payment_sessions",
     })
-    const { payment_collection } = await sdk.store.payment.initiatePaymentSession(cart, {
-      provider_id: providerId,
-    })
+    const hasSubscription = (cart.items ?? []).some((i) => (i.metadata as any)?.[SUBSCRIPTION_ITEM_KEY])
+    // Signed-in shoppers are sent as themselves so Medusa links a Stripe customer;
+    // subscriptions also ask Stripe to keep the card for future renewals.
+    const { payment_collection } = await sdk.store.payment.initiatePaymentSession(
+      cart,
+      {
+        provider_id: providerId,
+        ...(hasSubscription ? { data: { setup_future_usage: "off_session" } } : {}),
+      },
+      {},
+      await authHeaders()
+    )
     const session = payment_collection.payment_sessions?.find(
       (s) => s.provider_id === providerId
     )
