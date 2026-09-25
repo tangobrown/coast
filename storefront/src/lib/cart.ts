@@ -107,16 +107,14 @@ export async function getCart(): Promise<CartView | null> {
   return cart ? toView(cart) : null
 }
 
-async function getOrCreateCartId(): Promise<string> {
-  const id = await getCartId()
-  if (id && (await retrieveRaw(id))) return id
+async function createCart(): Promise<string> {
   const region = await getRegion()
   // UK-only store: set the country up front so delivery options can be listed
   // before the shopper has typed an address.
-  const { cart } = await sdk.store.cart.create({
-    region_id: region.id,
-    shipping_address: { country_code: "gb" },
-  })
+  const { cart } = await sdk.store.cart.create(
+    { region_id: region.id, shipping_address: { country_code: "gb" } },
+    { fields: "id" }
+  )
   await setCartId(cart.id)
   return cart.id
 }
@@ -135,11 +133,25 @@ function fail(e: unknown): { ok: false; error: string } {
   return { ok: false, error: message }
 }
 
+// Each mutation asks Medusa to return the updated cart in the same response,
+// so a click is one round trip to the backend rather than three.
+const WITH_CART = { fields: CART_FIELDS }
+
 export async function addToCart(variantId: string, quantity: number): Promise<ActionResult> {
+  const body = { variant_id: variantId, quantity }
   try {
-    const id = await getOrCreateCartId()
-    await sdk.store.cart.createLineItem(id, { variant_id: variantId, quantity })
-    return { ok: true, data: await viewById(id) }
+    const existing = await getCartId()
+    if (existing) {
+      try {
+        const { cart } = await sdk.store.cart.createLineItem(existing, body, WITH_CART)
+        return { ok: true, data: await toView(cart) }
+      } catch {
+        // Cart expired or was already checked out — start a fresh one below.
+      }
+    }
+    const id = await createCart()
+    const { cart } = await sdk.store.cart.createLineItem(id, body, WITH_CART)
+    return { ok: true, data: await toView(cart) }
   } catch (e) {
     return fail(e)
   }
@@ -150,11 +162,11 @@ export async function updateLineItem(lineId: string, quantity: number): Promise<
     const id = await getCartId()
     if (!id) throw new Error("No cart")
     if (quantity < 1) {
-      await sdk.store.cart.deleteLineItem(id, lineId)
-    } else {
-      await sdk.store.cart.updateLineItem(id, lineId, { quantity })
+      const { parent } = await sdk.store.cart.deleteLineItem(id, lineId, WITH_CART)
+      return { ok: true, data: parent ? await toView(parent) : await viewById(id) }
     }
-    return { ok: true, data: await viewById(id) }
+    const { cart } = await sdk.store.cart.updateLineItem(id, lineId, { quantity }, WITH_CART)
+    return { ok: true, data: await toView(cart) }
   } catch (e) {
     return fail(e)
   }
@@ -170,14 +182,14 @@ export async function applyPromoCode(code: string): Promise<ActionResult> {
     if (!id) throw new Error("No cart")
     const trimmed = code.trim()
     if (!trimmed) throw new Error("Enter a discount code")
-    const { cart } = await sdk.store.cart.update(id, { promo_codes: [trimmed] })
+    const { cart } = await sdk.store.cart.update(id, { promo_codes: [trimmed] }, WITH_CART)
     const applied = (cart.promotions ?? []).some(
       (p) => p.code?.toLowerCase() === trimmed.toLowerCase()
     )
     if (!applied) {
       return { ok: false, error: "That code isn’t valid." }
     }
-    return { ok: true, data: await viewById(id) }
+    return { ok: true, data: await toView(cart) }
   } catch (e) {
     return fail(e)
   }
@@ -256,8 +268,12 @@ export async function saveCheckoutDetails(
         : address,
       metadata: { refill_reminders: details.refillReminders },
     })
-    await sdk.store.cart.addShippingMethod(id, { option_id: shippingOptionId })
-    return { ok: true, data: await viewById(id) }
+    const { cart } = await sdk.store.cart.addShippingMethod(
+      id,
+      { option_id: shippingOptionId },
+      WITH_CART
+    )
+    return { ok: true, data: await toView(cart) }
   } catch (e) {
     return fail(e)
   }
@@ -268,8 +284,12 @@ export async function setShippingMethod(shippingOptionId: string): Promise<Actio
   try {
     const id = await getCartId()
     if (!id) throw new Error("No cart")
-    await sdk.store.cart.addShippingMethod(id, { option_id: shippingOptionId })
-    return { ok: true, data: await viewById(id) }
+    const { cart } = await sdk.store.cart.addShippingMethod(
+      id,
+      { option_id: shippingOptionId },
+      WITH_CART
+    )
+    return { ok: true, data: await toView(cart) }
   } catch (e) {
     return fail(e)
   }

@@ -11,7 +11,7 @@ import { useCart } from "./CartProvider"
 const STANDARD_DELIVERY = 3.95
 
 export function BagPage() {
-  const { cart, updateItem, removeItem, pending, error } = useCart()
+  const { cart, updateItem, removeItem, error } = useCart()
   const items = cart?.items ?? []
   const subtotal = cart?.subtotal ?? 0
   const { unlocked } = freeShippingProgress(subtotal)
@@ -40,7 +40,7 @@ export function BagPage() {
             <div className="mb-[22px] rounded-[10px] bg-paper px-[22px] py-[18px]">
               <FreeShippingBar subtotal={subtotal} size="md" />
             </div>
-            <ul className={`transition-opacity ${pending ? "opacity-60" : ""}`}>
+            <ul >
               {items.map((item) => (
                 <li
                   key={item.id}
@@ -65,14 +65,12 @@ export function BagPage() {
                     <div className="flex items-center gap-4">
                       <QtyStepper
                         value={item.quantity}
-                        disabled={pending}
                         label={`Quantity of ${item.title}`}
                         onChange={(q) => updateItem(item.id, q)}
                       />
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        disabled={pending}
                         className="text-sm text-muted underline hover:text-teal"
                       >
                         Remove

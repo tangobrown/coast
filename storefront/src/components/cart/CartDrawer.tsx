@@ -11,7 +11,7 @@ import { btnPrimary, btnSecondary } from "../ui/styles"
 import { useCart } from "./CartProvider"
 
 export function CartDrawer() {
-  const { cart, drawerOpen, closeDrawer, updateItem, removeItem, pending, error } = useCart()
+  const { cart, drawerOpen, closeDrawer, updateItem, removeItem, error } = useCart()
   const panelRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
   const pathname = usePathname()
@@ -96,7 +96,7 @@ export function CartDrawer() {
           <FreeShippingBar subtotal={cart?.subtotal ?? 0} />
         </div>
 
-        <div className={`flex-1 overflow-auto px-[26px] py-1.5 transition-opacity ${pending ? "opacity-60" : ""}`}>
+        <div className={`flex-1 overflow-auto px-[26px] py-1.5 transition-opacity`}>
           {items.length === 0 ? (
             <p className="py-10 text-center text-muted">Your bag is empty.</p>
           ) : (
@@ -123,14 +123,12 @@ export function CartDrawer() {
                       <QtyStepper
                         size="sm"
                         value={item.quantity}
-                        disabled={pending}
                         label={`Quantity of ${item.title}`}
                         onChange={(q) => updateItem(item.id, q)}
                       />
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
-                        disabled={pending}
                         className="text-[13px] text-muted underline hover:text-teal"
                       >
                         Remove
