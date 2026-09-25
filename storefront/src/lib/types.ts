@@ -79,3 +79,23 @@ export type ShippingOptionView = {
   description: string
   amount: number
 }
+
+export type CustomerView = {
+  id: string
+  email: string
+  firstName: string
+  lastName: string
+  phone: string
+  /** Default delivery address, if the customer has saved one. */
+  address: (Address & { id: string }) | null
+}
+
+export type OrderSummary = {
+  id: string
+  displayId: number
+  createdAt: string
+  total: number
+  status: string
+  fulfillmentStatus: string
+  items: { title: string; subtitle: string; quantity: number }[]
+}

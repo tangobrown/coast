@@ -4,6 +4,8 @@ import type { HttpTypes } from "@medusajs/types"
 import { cookies } from "next/headers"
 import { getRegion, getScents } from "./catalogue"
 import { sdk } from "./medusa"
+import { authHeaders, getAuthToken } from "./session"
+import { getCustomer, saveAddress } from "./auth"
 import type { Address, CartView, ShippingOptionView } from "./types"
 
 const CART_COOKIE = "_coast_cart_id"
@@ -111,9 +113,11 @@ async function createCart(): Promise<string> {
   const region = await getRegion()
   // UK-only store: set the country up front so delivery options can be listed
   // before the shopper has typed an address.
+  // Signed-in shoppers get a bag that belongs to their account.
   const { cart } = await sdk.store.cart.create(
     { region_id: region.id, shipping_address: { country_code: "gb" } },
-    { fields: "id" }
+    { fields: "id" },
+    await authHeaders()
   )
   await setCartId(cart.id)
   return cart.id
@@ -276,6 +280,11 @@ export async function saveCheckoutDetails(
       { option_id: shippingOptionId },
       WITH_CART
     )
+    // First order for a signed-in customer: remember their address.
+    if (await getAuthToken()) {
+      const customer = await getCustomer()
+      if (customer && !customer.address) await saveAddress(details.address)
+    }
     return { ok: true, data: await toView(cart) }
   } catch (e) {
     return fail(e)

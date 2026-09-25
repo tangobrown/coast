@@ -16,6 +16,9 @@ export function Footer() {
             {l.label}
           </Link>
         ))}
+        <Link href="/account" className="text-ink">
+          Account
+        </Link>
         <Link href="/cart" className="text-ink">
           Bag
         </Link>

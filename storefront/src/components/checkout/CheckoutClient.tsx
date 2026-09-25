@@ -11,7 +11,7 @@ import {
   type CheckoutDetails,
 } from "@/lib/cart"
 import { formatMoney } from "@/lib/money"
-import type { Address, ShippingOptionView } from "@/lib/types"
+import type { Address, CustomerView, ShippingOptionView } from "@/lib/types"
 import { EMPTY_ADDRESS, validateAddress, validateEmail, type FieldErrors } from "@/lib/validation"
 import { useCart } from "../cart/CartProvider"
 import { Spinner } from "../ui/Spinner"
@@ -31,6 +31,7 @@ type Props = {
   shippingOptions: ShippingOptionView[]
   stripeKey: string | null
   allowTestOrders: boolean
+  customer: CustomerView | null
 }
 
 export function CheckoutClient(props: Props) {
@@ -46,7 +47,7 @@ export function CheckoutClient(props: Props) {
   return <CheckoutForm {...props} />
 }
 
-function CheckoutForm({ shippingOptions, stripeKey, allowTestOrders }: Props) {
+function CheckoutForm({ shippingOptions, stripeKey, allowTestOrders, customer }: Props) {
   const router = useRouter()
   const { cart, setCart } = useCart()
   const stripeRef = useRef<StripeHandles>({ stripe: null, elements: null })
@@ -54,9 +55,20 @@ function CheckoutForm({ shippingOptions, stripeKey, allowTestOrders }: Props) {
     stripeRef.current = h
   }, [])
 
-  const [email, setEmail] = useState(cart?.email ?? "")
+  const [email, setEmail] = useState(cart?.email || customer?.email || "")
   const [refillReminders, setRefillReminders] = useState(cart?.refillReminders ?? true)
-  const [address, setAddress] = useState<Address>({ ...EMPTY_ADDRESS, ...cart?.shippingAddress })
+  // Prefer what's already on the bag; otherwise the signed-in customer's saved address.
+  const [address, setAddress] = useState<Address>(() => {
+    if (cart?.shippingAddress?.address1) return { ...EMPTY_ADDRESS, ...cart.shippingAddress }
+    if (customer?.address) return { ...EMPTY_ADDRESS, ...customer.address }
+    return {
+      ...EMPTY_ADDRESS,
+      ...cart?.shippingAddress,
+      firstName: customer?.firstName ?? "",
+      lastName: customer?.lastName ?? "",
+      phone: customer?.phone ?? "",
+    }
+  })
   const [billingSame, setBillingSame] = useState(true)
   const [billing, setBilling] = useState<Address>(EMPTY_ADDRESS)
   const [shippingId, setShippingId] = useState<string | null>(

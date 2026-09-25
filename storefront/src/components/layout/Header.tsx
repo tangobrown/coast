@@ -32,6 +32,7 @@ export function Header() {
         <Link href="/shop" className="hidden sm:inline">
           Shop all
         </Link>
+        <Link href="/account">Account</Link>
         <button
           type="button"
           onClick={openDrawer}

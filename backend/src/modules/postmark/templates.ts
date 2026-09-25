@@ -119,10 +119,53 @@ function orderPlaced(d: OrderData) {
   }
 }
 
+function button(href: string, label: string) {
+  return `<a href="${esc(href)}" style="display:inline-block;background:${C.ink};color:${C.paper};text-decoration:none;font-weight:600;font-size:15px;padding:14px 30px;border-radius:100px;">${esc(label)}</a>`
+}
+
+function simple(opts: {
+  subject: string
+  heading: string
+  paragraphs: string[]
+  cta?: { href: string; label: string }
+  footnote?: string
+  storefront_url: string
+}) {
+  const body = `
+    <h1 style="margin:0 0 16px;font-family:${SERIF};font-weight:400;font-size:34px;line-height:1.05;">${opts.heading}</h1>
+    ${opts.paragraphs.map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${C.ink2};">${p}</p>`).join("")}
+    ${opts.cta ? `<div style="margin-top:26px;">${button(opts.cta.href, opts.cta.label)}</div>` : ""}
+    ${opts.footnote ? `<p style="margin:26px 0 0;font-size:13px;line-height:1.6;color:${C.muted};">${opts.footnote}</p>` : ""}`
+  const strip = (s: string) => s.replace(/<[^>]+>/g, "")
+  const text = [strip(opts.heading), "", ...opts.paragraphs.map(strip), ...(opts.cta ? ["", `${opts.cta.label}: ${opts.cta.href}`] : []), ...(opts.footnote ? ["", strip(opts.footnote)] : [])].join("\n")
+  return { subject: opts.subject, html: layout(strip(opts.paragraphs[0] ?? ""), body, opts.storefront_url), text }
+}
+
 export function renderEmail(template: string, data: Record<string, unknown>) {
+  const d = data as Record<string, any>
   switch (template) {
     case "order-placed":
       return orderPlaced(data as unknown as OrderData)
+    case "password-reset":
+      return simple({
+        subject: "Reset your Coast password",
+        heading: "Reset your password",
+        paragraphs: ["Someone (hopefully you) asked to reset the password for your Coast account. The link below works for the next 15 minutes."],
+        cta: { href: d.reset_url, label: "Choose a new password" },
+        footnote: "If you didn’t ask for this, you can ignore this email — your password won’t change.",
+        storefront_url: d.storefront_url,
+      })
+    case "subscription-payment-failed":
+      return simple({
+        subject: "We couldn’t take payment for your Coast refill",
+        heading: `Your <em style="color:${C.teal};">${esc(d.product_title)}</em> refill is on hold`,
+        paragraphs: [
+          `We tried to take ${esc(formatMoney(d.amount))} for your next refill, but the payment didn’t go through${d.reason ? ` (${esc(d.reason)})` : ""}.`,
+          "Update your card in your account and we’ll send it straight out. We’ll also try again automatically in a few days.",
+        ],
+        cta: { href: `${d.storefront_url}/account/subscriptions`, label: "Update payment details" },
+        storefront_url: d.storefront_url,
+      })
     default:
       throw new Error(`Unknown email template: ${template}`)
   }

@@ -25,7 +25,7 @@ if (STRIPE_API_KEY) {
             webhookSecret: STRIPE_WEBHOOK_SECRET,
             capture: true,
             // Lets the Payment Element offer cards, Apple Pay, Google Pay and Link.
-            automatic_payment_methods: true,
+            automaticPaymentMethods: true,
           },
         },
       ],
