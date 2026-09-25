@@ -1,0 +1,14 @@
+/dist
+.env
+.DS_Store
+/uploads
+/static
+/node_modules
+npm-debug.log
+.idea
+coverage
+!src/**
+./tsconfig.tsbuildinfo
+build
+.cache
+.medusa

@@ -1,0 +1,148 @@
+# Coast Fragrances
+
+Online store for Coast car fragrances.
+
+| Folder | What it is | Tech |
+|---|---|---|
+| [`backend/`](backend) | Products, cart, orders, payments + the **admin dashboard** at `/app` | Medusa v2.21, Postgres, Redis, Stripe |
+| [`storefront/`](storefront) | The customer-facing shop | Next.js 16 (App Router), React 19, Tailwind CSS v4 |
+
+The storefront is built from the Claude Design handoff (Home, Shop, Product, Our Story, bag drawer, Bag, Checkout, Order confirmation).
+
+---
+
+## Deploying to Railway
+
+You'll end up with **four things** in one Railway project: Postgres, Redis, the backend, and the storefront.
+
+### 1. Create the project and databases
+
+1. In Railway: **New Project → Deploy from GitHub repo →** pick `tangobrown/coast`. Railway creates one service; this will be the **backend**. Rename it to `backend` (Settings → name).
+2. In the same project: **+ Create → Database → PostgreSQL**.
+3. Again: **+ Create → Database → Redis**.
+
+### 2. Configure the backend service
+
+**Settings → Source**
+- **Root Directory:** `/backend`
+
+**Settings → Config-as-code** (Railway doesn't pick this up from the root directory automatically)
+- **Railway Config File:** `/backend/railway.json`
+
+That file sets the build command, start command and health check for you.
+
+**Settings → Networking** → **Generate Domain** (gives you something like `backend-production-xxxx.up.railway.app`).
+
+**Variables** → switch to the **Raw Editor** and paste this, then fill in the three `CHANGE_ME` values:
+
+```env
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+REDIS_URL=${{Redis.REDIS_URL}}
+JWT_SECRET=CHANGE_ME_long_random_string
+COOKIE_SECRET=CHANGE_ME_another_long_random_string
+MEDUSA_BACKEND_URL=https://${{RAILWAY_PUBLIC_DOMAIN}}
+ADMIN_CORS=https://${{RAILWAY_PUBLIC_DOMAIN}}
+AUTH_CORS=https://${{RAILWAY_PUBLIC_DOMAIN}}
+STORE_CORS=https://${{storefront.RAILWAY_PUBLIC_DOMAIN}}
+MEDUSA_ADMIN_EMAIL=you@example.com
+MEDUSA_ADMIN_PASSWORD=CHANGE_ME_admin_password
+```
+
+> For the random secrets, any long string works. For example, run `openssl rand -hex 32` twice, or mash the keyboard for about 40 characters.
+
+Deploy. The **first** deploy automatically:
+- sets up the database tables
+- creates the UK region (GBP, VAT-inclusive), delivery options, the Hang / Stick / Clip collections and all 9 scents
+- creates your admin login from `MEDUSA_ADMIN_EMAIL` / `MEDUSA_ADMIN_PASSWORD`
+- prints the **storefront publishable key** in the deploy logs. Look for `[bootstrap] Storefront publishable key: pk_…`
+
+Later deploys skip the seeding, so your edits in the admin are never overwritten.
+
+**Admin dashboard:** `https://<backend-domain>/app`
+
+### 3. Add the storefront service
+
+1. **+ Create → GitHub Repo →** `tangobrown/coast` again. Rename it to `storefront`. The name matters because the backend's `STORE_CORS` refers to it.
+2. **Settings → Source → Root Directory:** `/storefront`
+3. **Settings → Config-as-code → Railway Config File:** `/storefront/railway.json`
+4. **Settings → Networking → Generate Domain.**
+5. **Variables** (Raw Editor):
+
+```env
+MEDUSA_BACKEND_URL=https://${{backend.RAILWAY_PUBLIC_DOMAIN}}
+MEDUSA_PUBLISHABLE_KEY=pk_paste_from_backend_deploy_logs
+STRIPE_PUBLISHABLE_KEY=
+ALLOW_TEST_ORDERS=true
+```
+
+`ALLOW_TEST_ORDERS=true` lets you click through checkout and place **unpaid test orders** before Stripe is connected. Set it to `false` (or delete it) before you launch.
+
+### 4. When you're ready for Stripe
+
+1. In the Stripe Dashboard → **Developers → API keys**, copy the **Secret key** (`sk_…`) and **Publishable key** (`pk_…`). Use the *test* keys first.
+2. **Backend** variables: add `STRIPE_API_KEY=sk_…`
+3. **Storefront** variables: set `STRIPE_PUBLISHABLE_KEY=pk_…` and `ALLOW_TEST_ORDERS=false`
+4. **Webhook** (so Medusa hears about payments that finish after the shopper leaves the page): Stripe → **Developers → Webhooks → Add endpoint**
+   - URL: `https://<backend-domain>/hooks/payment/stripe_stripe`
+   - Events: `payment_intent.succeeded`, `payment_intent.amount_capturable_updated`, `payment_intent.payment_failed`, `payment_intent.partially_funded`
+   - Copy the signing secret (`whsec_…`) into the **backend** as `STRIPE_WEBHOOK_SECRET`.
+5. **Apple Pay / Google Pay:** Stripe → **Settings → Payment method domains** → add your storefront domain.
+
+On the next backend deploy, the UK region automatically switches to Stripe as its only payment method. The unpaid test-order option is removed, so nobody can check out without paying.
+
+Test card: `4242 4242 4242 4242`, any future expiry, any CVC.
+
+### 5. Custom domain (optional)
+
+Storefront → **Settings → Networking → Custom Domain**. Then update the backend's `STORE_CORS` to include it (comma-separated), and add the domain in Stripe's payment method domains.
+
+---
+
+## Everyday tasks
+
+**Change products, prices, copy:** Admin → Products. Scent notes live in each product's **Metadata**: `notes_top`, `notes_heart`, `notes_base`, `short_notes`. Best-sellers are products with the `bestseller` tag (ordered by `bestseller_rank` metadata).
+
+**Line copy (Hang / Stick / Clip):** Admin → Products → Collections → Metadata: `format`, `life`, `intro`, `desc`, `how_to_use`, `sort`.
+
+**Product photos:** upload them per product in the admin. The first image is used on cards; the first four make up the product gallery.
+> Uploads are currently stored on the backend's disk, which Railway **wipes on every redeploy**. Before adding real photography, set up S3 or Cloudflare R2 file storage (a small config change in `backend/medusa-config.ts`).
+
+**Editorial images** (home hero, line rows, Our Story): put files in `storefront/public/images/` and set their paths in [`storefront/src/lib/site-images.ts`](storefront/src/lib/site-images.ts).
+
+**Announcement bar:** set `NEXT_PUBLIC_ANNOUNCEMENT` on the storefront (then redeploy).
+
+**Discount codes:** Admin → Promotions. They work in the checkout's "Discount code" box.
+
+**Delivery prices:** Admin → Settings → Locations & Shipping. Standard is £3.95, dropping to £0 when the item total is £30 or more (a price rule on the Standard option).
+
+---
+
+## Local development
+
+Requires Node 22, Postgres and Redis.
+
+```bash
+# Backend
+cd backend
+cp .env.template .env        # fill in DATABASE_URL etc.
+npm install
+npx medusa db:migrate
+npm run bootstrap            # seeds the store, creates admin, prints publishable key
+npm run dev                  # http://localhost:9000  (admin at /app)
+
+# Storefront (new terminal)
+cd storefront
+cp .env.template .env        # paste the publishable key
+npm install
+npm run dev                  # http://localhost:8000
+```
+
+---
+
+## Notes and decisions
+
+- **Prices include VAT.** The UK tax region uses 20% VAT, and prices are tax-inclusive, so £16 on the site is £16 at checkout. If you're not VAT-registered yet, set the rate to 0% in Admin → Settings → Tax Regions. Prices won't change.
+- **Guest checkout only.** No customer accounts yet.
+- **PayPal dropped.** The express row offers Apple Pay and Google Pay through Stripe.
+- **No emails yet.** The refill-reminder opt-in is saved on each order (`metadata.refill_reminders`), ready for when an email provider is added.
+- **Not done yet:** image storage (see above), email notifications, customer accounts.

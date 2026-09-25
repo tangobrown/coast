@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/* Design tokens from the Coast handoff. */
+@theme {
+  --color-sand: #f3eee4;
+  --color-paper: #fbf9f5;
+  --color-stone: #e5decf;
+  --color-line: #ddd5c6;
+  --color-line-soft: #e8e2d7;
+  --color-input-border: #cfc7b7;
+  --color-ink: #201d1a;
+  --color-ink-2: #5a544a;
+  --color-muted: #6b655c;
+  --color-muted-2: #8a8375;
+  --color-numeral: #c4bca9;
+  --color-teal: #2e4b4e;
+  --color-teal-ink: #f6f2eb;
+  --color-hover: #f6f2eb;
+  --color-danger: #9a3b2e;
+
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
+  --font-sans: var(--font-hanken-grotesk), system-ui, sans-serif;
+
+  --spacing-page: clamp(20px, 4vw, 56px);
+  --container-site: 1440px;
+
+  --shadow-drawer: -20px 0 60px rgba(32, 29, 26, 0.15);
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+  }
+  body {
+    background: var(--color-sand);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+  a {
+    transition: color 150ms ease-out;
+  }
+  a:hover {
+    color: var(--color-teal);
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 2px;
+  }
+}
