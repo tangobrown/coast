@@ -2,13 +2,17 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+import type { SearchItem } from "@/lib/search"
 import { useCart } from "../cart/CartProvider"
 import { NAV_LINKS } from "./nav"
+import { SearchDialog, SearchIcon } from "./SearchDialog"
 
-export function Header() {
+export function Header({ searchItems }: { searchItems: SearchItem[] }) {
   const { cart, openDrawer } = useCart()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const closeSearch = useCallback(() => setSearchOpen(false), [])
   const pathname = usePathname()
   const count = cart?.itemCount ?? 0
 
@@ -29,6 +33,15 @@ export function Header() {
       </nav>
 
       <div className="flex items-center gap-[22px] text-[15px] font-medium">
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          aria-label="Search"
+          aria-haspopup="dialog"
+          className="-m-2 p-2 text-ink transition-colors hover:text-teal"
+        >
+          <SearchIcon />
+        </button>
         <Link href="/shop" className="hidden sm:inline">
           Shop all
         </Link>
@@ -51,6 +64,8 @@ export function Header() {
           {menuOpen ? "Close" : "Menu"}
         </button>
       </div>
+
+      <SearchDialog open={searchOpen} onClose={closeSearch} items={searchItems} />
 
       {menuOpen && (
         <nav
