@@ -69,7 +69,9 @@ async function toView(cart: HttpTypes.StoreCart): Promise<CartView> {
           ? `Refill every ${weeks} weeks`
           : isRefill
             ? "Refill"
-            : (scent?.line?.format ?? item.variant_title ?? ""),
+            : scent?.packs.length
+              ? (item.variant_title ?? "")
+              : (scent?.line?.format ?? item.variant_title ?? ""),
         quantity: item.quantity,
         unitPrice: unit,
         total: unit * item.quantity,

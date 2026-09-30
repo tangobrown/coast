@@ -143,7 +143,9 @@ Without a token, emails are only written to the backend logs. Emails sent today:
 
 **Change products, prices, copy:** Admin → Products. Scent notes live in each product's **Metadata**: `notes_top`, `notes_heart`, `notes_base`, `short_notes`. Best-sellers are products with the `bestseller` tag (ordered by `bestseller_rank` metadata).
 
-**Line copy (Hang / Stick / Clip):** Admin → Products → Collections → Metadata: `format`, `life`, `intro`, `desc`, `how_to_use`, `sort`.
+**Wipe line:** the car wipes (collection `wipe`) were added after launch; the backend creates them on its next deploy if they don't exist yet (`backend/src/catalogue/ensure-wipes.ts`), then never touches them again. Products whose variants use a **"Pack"** option (instead of the fragrance lines' "Type: Full / Refill") get pack-size cards on the product page, "from £X" pricing, and no subscription option. To add another pack-style product, give it a "Pack" option in the admin.
+
+**Line copy (Hang / Stick / Clip / Wipe):** Admin → Products → Collections → Metadata: `format`, `life`, `intro`, `desc`, `how_to_use`, `whats_in_it` (optional), `sort`.
 
 **Product photos:** upload them per product in the admin. The first image is used on cards; the first four make up the product gallery.
 > Uploads are currently stored on the backend's disk, which Railway **wipes on every redeploy**. Before adding real photography, set up S3 or Cloudflare R2 file storage (a small config change in `backend/medusa-config.ts`).

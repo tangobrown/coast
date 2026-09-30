@@ -4,6 +4,7 @@ import {
   createUsersWorkflow,
   updateRegionsWorkflow,
 } from "@medusajs/medusa/core-flows"
+import { ensureWipes } from "../catalogue/ensure-wipes"
 import { REGION_NAME, seedCoast, wantedPaymentProviders } from "./seed"
 
 /**
@@ -26,6 +27,8 @@ export default async function bootstrap({ container }: ExecArgs) {
     await seedCoast(container)
     ;[region] = await regionService.listRegions({ name: REGION_NAME })
   }
+  // Catalogue additions made after launch (each only ever runs once).
+  await ensureWipes(container)
 
   // 2. Payment providers
   const { data: regionData } = await query.graph({

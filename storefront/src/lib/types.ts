@@ -9,6 +9,8 @@ export type Line = {
   intro: string
   desc: string
   howToUse: string
+  /** Optional "What's in it" copy for the line (falls back to the fragrance text). */
+  whatsInIt: string
   sort: number
 }
 
@@ -29,6 +31,11 @@ export type Scent = {
   line: Line | null
   full: ScentVariant | null
   refill: ScentVariant | null
+  /**
+   * Size options for products that aren't sold as vessel/refill (e.g. wipes:
+   * "20 wipes", "60 wipes"), cheapest first. Empty for fragrance lines.
+   */
+  packs: (ScentVariant & { label: string })[]
   thumbnail: string | null
   images: string[]
   sort: number

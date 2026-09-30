@@ -39,7 +39,7 @@ export default async function HomePage() {
       </section>
 
       {/* Line rows */}
-      <section className="px-page py-5" aria-label="Our three formats">
+      <section className="px-page py-5" aria-label="Our formats">
         {lines.map((line, i) => {
           const from = fromPrice(scents.filter((s) => s.line?.id === line.id))
           return (

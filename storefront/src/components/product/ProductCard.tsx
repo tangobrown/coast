@@ -36,7 +36,12 @@ export function ProductCard({
         <h3 className="text-base font-semibold text-ink transition-colors group-hover:text-teal">
           {scent.title}
         </h3>
-        {price != null && <span className="text-[15px] font-semibold text-ink">{formatMoney(price)}</span>}
+        {price != null && (
+          <span className="shrink-0 text-[15px] font-semibold text-ink">
+            {!refill && scent.packs.length > 1 && <span className="font-normal text-muted">from </span>}
+            {formatMoney(price)}
+          </span>
+        )}
       </div>
       {showNotes && scent.shortNotes && (
         <p className="mt-[5px] text-[13.5px] leading-[1.45] text-muted">{scent.shortNotes}</p>

@@ -17,6 +17,7 @@ export const SITE_IMAGES: {
     hang: null,
     stick: null,
     clip: null,
+    wipe: null,
   },
   storyHero: null,
   storyRefill: null,

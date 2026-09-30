@@ -22,7 +22,7 @@ export async function ShopView({ filter }: { filter: string }) {
     ? "Keep the bottle, the slab or the clip. Top up the scent from £6, posted flat through your letterbox."
     : line
       ? line.intro
-      : "Nine real fragrances across three formats. Every one built from proper notes — no fake cherry, no toilet-cleaner pine."
+      : "Real fragrance for the car — to hang, stick, clip or wipe. Every one built from proper notes — no fake cherry, no toilet-cleaner pine."
 
   const items = line
     ? scents.filter((s) => s.line?.id === line.id)

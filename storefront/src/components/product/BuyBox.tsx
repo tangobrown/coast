@@ -63,6 +63,8 @@ export function BuyBox({
     initialVariant === "refill" && scent.refill ? "refill" : "full"
   )
   const [qty, setQty] = useState(1)
+  const hasPacks = scent.packs.length > 0
+  const [packId, setPackId] = useState(scent.packs[0]?.id ?? null)
   const [subscribe, setSubscribe] = useState(false)
   const [weeks, setWeeks] = useState<number>(DEFAULT_WEEKS)
   const [adding, setAdding] = useState(false)
@@ -70,7 +72,11 @@ export function BuyBox({
 
   const line = scent.line
   const format = line?.format ?? "Full"
-  const variant = kind === "refill" ? scent.refill : scent.full
+  const variant = hasPacks
+    ? (scent.packs.find((p) => p.id === packId) ?? null)
+    : kind === "refill"
+      ? scent.refill
+      : scent.full
   const isSubscription = kind === "refill" && subscribe
   const refillPrice = scent.refill?.price ?? 0
   const unit = isSubscription ? subscriberPrice(refillPrice) : (variant?.price ?? 0)
@@ -124,6 +130,32 @@ export function BuyBox({
         ))}
       </dl>
 
+      {hasPacks ? (
+        <fieldset className="mb-[22px]">
+          <legend className="mb-2.5 text-sm font-semibold">Choose a pack</legend>
+          <div className="grid grid-cols-2 gap-2.5">
+            {scent.packs.map((p) => (
+              <label
+                key={p.id}
+                className={`cursor-pointer rounded-[10px] border-[1.5px] bg-paper p-4 text-ink transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-teal ${
+                  packId === p.id ? "border-ink" : "border-line hover:border-input-border"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="pack"
+                  value={p.id}
+                  checked={packId === p.id}
+                  onChange={() => setPackId(p.id)}
+                  className="sr-only"
+                />
+                <div className="text-[15px] font-semibold">{p.label}</div>
+                <div className="mt-[3px] text-[13px] text-muted">{formatMoney(p.price)}</div>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+      ) : (
       <fieldset className="mb-[22px]">
         <legend className="mb-2.5 text-sm font-semibold">Choose</legend>
         <div className="grid grid-cols-2 gap-2.5">
@@ -152,8 +184,9 @@ export function BuyBox({
           )}
         </div>
       </fieldset>
+      )}
 
-      {kind === "refill" && scent.refill && (
+      {!hasPacks && kind === "refill" && scent.refill && (
         <fieldset className="mb-[22px]">
           <legend className="mb-2.5 text-sm font-semibold">How would you like it?</legend>
           <div className="grid gap-2.5">
@@ -217,12 +250,16 @@ export function BuyBox({
           { title: "How to use", body: line?.howToUse || "Instructions coming soon." },
           {
             title: "What’s in it",
-            body: 'Perfumer-grade fragrance oils, blended in small batches in the UK. No synthetic "flavour" accords, no parabens, no phthalates.',
+            body:
+              line?.whatsInIt ||
+              'Perfumer-grade fragrance oils, blended in small batches in the UK. No synthetic "flavour" accords, no parabens, no phthalates.',
           },
-          {
-            title: "Delivery & refills",
-            body: "Free UK delivery over £30, otherwise £3.95. Refills fit through the letterbox, and we’ll remind you when yours is due.",
-          },
+          hasPacks
+            ? { title: "Delivery", body: "Free UK delivery over £30, otherwise £3.95." }
+            : {
+                title: "Delivery & refills",
+                body: "Free UK delivery over £30, otherwise £3.95. Refills fit through the letterbox, and we’ll remind you when yours is due.",
+              },
         ]}
       />
     </div>

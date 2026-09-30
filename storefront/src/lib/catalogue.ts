@@ -57,6 +57,7 @@ function toLine(c: HttpTypes.StoreCollection | null | undefined): Line | null {
     intro: m.intro ?? "",
     desc: m.desc ?? "",
     howToUse: m.how_to_use ?? "",
+    whatsInIt: m.whats_in_it ?? "",
     sort: Number(m.sort ?? 99),
   }
 }
@@ -87,7 +88,25 @@ function variantOf(
   return { id: match.id, price: Number(match.calculated_price?.calculated_amount ?? 0) }
 }
 
+const isTypeProduct = (p: HttpTypes.StoreProduct) =>
+  (p.variants ?? []).some((v) => v.options?.some((o) => o.option?.title === "Type"))
+
+/** Pack-size variants, for products without a Full/Refill "Type" option. */
+function packsOf(p: HttpTypes.StoreProduct): Scent["packs"] {
+  if (isTypeProduct(p)) return []
+  return (p.variants ?? [])
+    .map((v) => ({
+      id: v.id,
+      label: v.options?.[0]?.value ?? v.title ?? "",
+      price: Number(v.calculated_price?.calculated_amount ?? 0),
+      rank: Number((v as any).variant_rank ?? 0),
+    }))
+    .sort((a, b) => a.rank - b.rank || a.price - b.price)
+    .map(({ rank: _rank, ...rest }) => rest)
+}
+
 function toScent(p: HttpTypes.StoreProduct, lines: Line[]): Scent {
+  const packs = packsOf(p)
   const m = (p.metadata ?? {}) as Record<string, any>
   const line = lines.find((l) => l.id === p.collection_id) ?? toLine(p.collection)
   return {
@@ -102,8 +121,10 @@ function toScent(p: HttpTypes.StoreProduct, lines: Line[]): Scent {
       base: m.notes_base ?? "",
     },
     line,
-    full: variantOf(p, "full"),
-    refill: variantOf(p, "refill"),
+    // Pack products use their smallest pack as the headline ("from") price.
+    full: packs.length ? { id: packs[0].id, price: packs[0].price } : variantOf(p, "full"),
+    refill: packs.length ? null : variantOf(p, "refill"),
+    packs,
     thumbnail: p.thumbnail ?? p.images?.[0]?.url ?? null,
     images: (p.images ?? []).map((i) => i.url),
     sort: Number(m.sort ?? 999),
